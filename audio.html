@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Local Audio Converter</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+<style>
+  :root{
+    --paper:#EDF0EC;
+    --surface:#FFFFFF;
+    --line:#DCE1DA;
+    --ink:#15201B;
+    --muted:#5C6B62;
+    --faint:#8A968D;
+    --signal:#0F7A6B;
+    --signal-deep:#0A5A4F;
+    --signal-wash:#E3F0ED;
+    --ok:#347A46;
+    --warn:#B27A12;
+    --err:#B0442F;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--paper);color:var(--ink)}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    line-height:1.5;
+    padding:24px 18px 64px;
+    -webkit-font-smoothing:antialiased;
+    max-width:760px;margin:0 auto;
+  }
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+
+  header{margin-bottom:22px}
+  .eyebrow{
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;
+    font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--signal-deep);margin-bottom:8px;
+  }
+  h1{
+    font-family:ui-serif,"New York",Georgia,serif;
+    font-weight:600;font-size:clamp(28px,7vw,40px);
+    letter-spacing:-.015em;line-height:1.05;margin-bottom:10px;
+  }
+  h1 em{font-style:italic;color:var(--signal-deep)}
+  .lede{color:var(--muted);font-size:15px;max-width:52ch}
+  .privacy{
+    display:inline-flex;align-items:center;gap:8px;margin-top:14px;
+    padding:7px 12px;border:1px solid var(--line);border-radius:999px;
+    background:var(--surface);font-size:12.5px;color:var(--muted);
+  }
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none;
+    box-shadow:0 0 0 3px rgba(52,122,70,.16)}
+
+  .controls{
+    display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;
+    margin:24px 0 14px;padding:16px;background:var(--surface);
+    border:1px solid var(--line);border-radius:var(--radius);
+  }
+  .ctl-label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
+    font-family:ui-monospace,monospace;width:100%;margin-bottom:-2px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--paper)}
+  .seg button{
+    appearance:none;border:0;background:transparent;color:var(--muted);
+    font:inherit;font-size:14px;font-weight:500;padding:9px 18px;cursor:pointer;
+    transition:background .15s,color .15s;
+  }
+  .seg button[aria-pressed="true"]{background:var(--signal);color:#fff}
+  .seg button:disabled{opacity:.4;cursor:not-allowed}
+  select{
+    appearance:none;font:inherit;font-size:14px;padding:9px 34px 9px 12px;
+    border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%235C6B62' stroke-width='1.6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 12px center;cursor:pointer;
+  }
+  select:disabled{opacity:.4}
+
+  .drop{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:6px;text-align:center;padding:34px 20px;cursor:pointer;
+    border:1.5px dashed var(--line);border-radius:var(--radius);background:var(--surface);
+    transition:border-color .15s,background .15s;
+  }
+  .drop:hover,.drop.over{border-color:var(--signal);background:var(--signal-wash)}
+  .drop strong{font-size:16px;font-weight:600}
+  .drop span{font-size:13px;color:var(--faint)}
+  .plus{width:34px;height:34px;border-radius:50%;background:var(--signal);position:relative;margin-bottom:4px}
+  .plus::before,.plus::after{content:"";position:absolute;background:#fff;border-radius:2px}
+  .plus::before{width:15px;height:2.5px;top:15.75px;left:9.5px}
+  .plus::after{height:15px;width:2.5px;left:15.75px;top:9.5px}
+
+  .bar{display:flex;gap:10px;margin:16px 0 6px;flex-wrap:wrap}
+  .btn{
+    appearance:none;font:inherit;font-size:14px;font-weight:600;cursor:pointer;
+    padding:11px 20px;border-radius:11px;border:1px solid transparent;transition:background .15s,opacity .15s;
+  }
+  .btn-go{background:var(--signal);color:#fff}
+  .btn-go:hover{background:var(--signal-deep)}
+  .btn-ghost{background:transparent;border-color:var(--line);color:var(--muted)}
+  .btn-ghost:hover{background:var(--surface)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+
+  ul{list-style:none;display:flex;flex-direction:column;gap:10px;margin-top:8px}
+  .item{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 16px;display:grid;grid-template-columns:1fr auto;gap:10px 14px;align-items:center;
+  }
+  .item .name{font-weight:600;font-size:14.5px;word-break:break-all}
+  .wave{grid-column:1/-1;width:100%;height:46px;display:block;border-radius:8px;background:var(--paper)}
+  .meta{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--muted)}
+  .meta b{color:var(--ink);font-weight:600}
+  .status{font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:7px}
+  .status .s-dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--faint)}
+  .st-decoding .s-dot,.st-encoding .s-dot{background:var(--warn);animation:pulse 1s ease-in-out infinite}
+  .st-done .s-dot{background:var(--ok)}
+  .st-error .s-dot{background:var(--err)}
+  .st-done{color:var(--ok)}.st-error{color:var(--err)}.st-decoding,.st-encoding{color:var(--warn)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .dl{
+    appearance:none;text-decoration:none;font:inherit;font-size:13px;font-weight:600;
+    background:var(--signal-wash);color:var(--signal-deep);border:1px solid #CFE4DF;
+    padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap;
+  }
+  .dl:hover{background:#D6ECE7}
+  .x{appearance:none;border:0;background:transparent;color:var(--faint);font-size:20px;
+    cursor:pointer;line-height:1;padding:0 4px}
+  .x:hover{color:var(--err)}
+  .row-top{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:12px}
+
+  .note{margin-top:20px;font-size:12.5px;color:var(--faint);line-height:1.6}
+  .banner{display:none;margin:0 0 14px;padding:11px 14px;border-radius:11px;font-size:13px;
+    background:#FBF2DC;border:1px solid #EAD9A8;color:#7A5B12}
+  .banner.show{display:block}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">On-device · no upload</div>
+  <h1>Local audio <em>converter</em></h1>
+  <p class="lede">Turn iPad recordings (AAC / M4A) into MP3 or WAV your WebXR platform can load. Files are decoded and re-encoded right here in the browser.</p>
+  <div class="privacy"><span class="dot"></span> Nothing leaves this device — no file is ever sent to a server.</div>
+</header>
+
+<div class="banner" id="banner"></div>
+
+<div class="controls">
+  <span class="ctl-label">Output format</span>
+  <div class="seg" role="group" aria-label="Output format">
+    <button id="fmt-mp3" aria-pressed="true">MP3</button>
+    <button id="fmt-wav" aria-pressed="false">WAV</button>
+  </div>
+  <label class="mono" id="kbps-wrap" style="font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:8px">
+    Quality
+    <select id="kbps">
+      <option value="128">128 kbps</option>
+      <option value="192" selected>192 kbps</option>
+      <option value="256">256 kbps</option>
+      <option value="320">320 kbps</option>
+    </select>
+  </label>
+</div>
+
+<label class="drop" id="drop" for="picker">
+  <span class="plus"></span>
+  <strong>Choose recordings</strong>
+  <span>Tap to pick from Files, or drop them here · you can select many at once</span>
+</label>
+<input id="picker" type="file" accept="audio/*,.m4a,.aac,.caf,.mp3,.wav" multiple hidden>
+
+<div class="bar" id="bar" style="display:none">
+  <button class="btn btn-go" id="convert">Convert all</button>
+  <button class="btn btn-ghost" id="clear">Clear list</button>
+</div>
+
+<ul id="list"></ul>
+
+<p class="note" id="note">Tip: MP3 at 192 kbps is plenty for spoken narration and keeps files small — handy if a scene loads many clips at once. Use WAV if your loader is still fussy after MP3. Nothing here is uploaded, which keeps student voice recordings on the device.</p>
+
+<script>
+(function(){
+  "use strict";
+  const MP3_OK = typeof lamejs !== "undefined" && lamejs && lamejs.Mp3Encoder;
+  let format = MP3_OK ? "mp3" : "wav";
+
+  const $ = s => document.querySelector(s);
+  const list = $("#list"), bar = $("#bar"), banner = $("#banner");
+  const fMp3 = $("#fmt-mp3"), fWav = $("#fmt-wav"), kbpsSel = $("#kbps"), kbpsWrap = $("#kbps-wrap");
+  const files = []; // {id,file,name,base,buffer,state,blob,outName,outSize,err}
+  let idc = 0, ctx = null;
+
+  if(!MP3_OK){
+    fMp3.disabled = true; kbpsSel.disabled = true; kbpsWrap.style.opacity = ".4";
+    setFormat("wav");
+    showBanner("MP3 encoder couldn't load (likely no network). WAV conversion still works fully offline.");
+  }
+
+  function showBanner(msg){ banner.textContent = msg; banner.classList.add("show"); }
+  function getCtx(){ if(!ctx) ctx = new (window.AudioContext||window.webkitAudioContext)(); return ctx; }
+  function fmtSize(b){ if(b<1024) return b+" B"; if(b<1048576) return (b/1024).toFixed(0)+" KB"; return (b/1048576).toFixed(1)+" MB"; }
+  function fmtTime(s){ const m=Math.floor(s/60), r=Math.round(s%60); return m+":"+String(r).padStart(2,"0"); }
+  function baseName(n){ const i=n.lastIndexOf("."); return i>0?n.slice(0,i):n; }
+
+  function setFormat(f){
+    format = f;
+    fMp3.setAttribute("aria-pressed", f==="mp3");
+    fWav.setAttribute("aria-pressed", f==="wav");
+    kbpsWrap.style.visibility = f==="mp3" ? "visible":"hidden";
+    // outputs are now stale
+    files.forEach(x=>{ if(x.state==="done"){ x.state="ready"; x.blob=null; } });
+    render();
+  }
+  fMp3.onclick = ()=> MP3_OK && setFormat("mp3");
+  fWav.onclick = ()=> setFormat("wav");
+  setFormat(format);
+
+  // ---- intake ----
+  const drop = $("#drop"), picker = $("#picker");
+  picker.onchange = e => { addFiles(e.target.files); picker.value=""; };
+  ["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");}));
+  ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");}));
+  drop.addEventListener("drop", e => { if(e.dataTransfer&&e.dataTransfer.files) addFiles(e.dataTransfer.files); });
+
+  function addFiles(fileList){
+    Array.from(fileList).forEach(file=>{
+      const rec = { id:++idc, file, name:file.name, base:baseName(file.name),
+                    origSize:file.size, buffer:null, state:"queued", blob:null,
+                    outName:"", outSize:0, err:"", dur:0, sr:0, ch:0 };
+      files.push(rec);
+      decode(rec);
+    });
+    bar.style.display = files.length ? "flex" : "none";
+    render();
+  }
+
+  async function decode(rec){
+    rec.state = "decoding"; render();
+    try{
+      const buf = await rec.file.arrayBuffer();
+      const audio = await new Promise((res,rej)=>{
+        const p = getCtx().decodeAudioData(buf.slice(0), res, rej);
+        if(p && p.then) p.then(res).catch(rej);
+      });
+      rec.buffer = audio; rec.dur = audio.duration; rec.sr = audio.sampleRate; rec.ch = audio.numberOfChannels;
+      rec.state = "ready";
+    }catch(err){
+      rec.state = "error"; rec.err = "Couldn't read this file — it may be an unsupported or damaged recording.";
+    }
+    render();
+  }
+
+  // ---- convert ----
+  $("#convert").onclick = async ()=>{
+    for(const rec of files){
+      if(rec.state==="ready") await convertOne(rec);
+    }
+  };
+  $("#clear").onclick = ()=>{ files.length=0; bar.style.display="none"; render(); };
+
+  async function convertOne(rec){
+    if(!rec.buffer){ return; }
+    rec.state = "encoding"; render();
+    await new Promise(r=>setTimeout(r,15)); // let UI paint
+    try{
+      let blob, ext;
+      if(format==="mp3" && MP3_OK){
+        blob = encodeMP3(rec.buffer, parseInt(kbpsSel.value,10)); ext="mp3";
+      }else{
+        blob = encodeWAV(rec.buffer); ext="wav";
+      }
+      rec.blob = blob; rec.outName = rec.base + "." + ext; rec.outSize = blob.size;
+      rec.state = "done";
+    }catch(err){
+      // MP3 can reject odd sample rates — fall back to WAV for this file
+      try{
+        rec.blob = encodeWAV(rec.buffer); rec.outName = rec.base + ".wav"; rec.outSize = rec.blob.size;
+        rec.state = "done"; rec.err = "MP3 failed for this clip, saved as WAV instead.";
+      }catch(e2){
+        rec.state = "error"; rec.err = "Encoding failed for this recording.";
+      }
+    }
+    render();
+  }
+
+  function floatTo16(input){
+    const out = new Int16Array(input.length);
+    for(let i=0;i<input.length;i++){ let s=Math.max(-1,Math.min(1,input[i])); out[i]= s<0 ? s*0x8000 : s*0x7FFF; }
+    return out;
+  }
+
+  function encodeMP3(audio, kbps){
+    const ch = audio.numberOfChannels>1?2:1, sr = audio.sampleRate;
+    const enc = new lamejs.Mp3Encoder(ch, sr, kbps);
+    const left = floatTo16(audio.getChannelData(0));
+    const right = ch>1 ? floatTo16(audio.getChannelData(1)) : null;
+    const block = 1152, out = [];
+    for(let i=0;i<left.length;i+=block){
+      const l = left.subarray(i,i+block);
+      const chunk = right ? enc.encodeBuffer(l, right.subarray(i,i+block)) : enc.encodeBuffer(l);
+      if(chunk.length) out.push(new Uint8Array(chunk));
+    }
+    const end = enc.flush(); if(end.length) out.push(new Uint8Array(end));
+    return new Blob(out,{type:"audio/mpeg"});
+  }
+
+  function encodeWAV(audio){
+    const ch=audio.numberOfChannels, sr=audio.sampleRate, frames=audio.length;
+    const blockAlign = ch*2, dataSize = frames*blockAlign;
+    const ab = new ArrayBuffer(44+dataSize), v = new DataView(ab);
+    const ws=(o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i,s.charCodeAt(i)); };
+    ws(0,"RIFF"); v.setUint32(4,36+dataSize,true); ws(8,"WAVE"); ws(12,"fmt ");
+    v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,ch,true);
+    v.setUint32(24,sr,true); v.setUint32(28,sr*blockAlign,true);
+    v.setUint16(32,blockAlign,true); v.setUint16(34,16,true); ws(36,"data"); v.setUint32(40,dataSize,true);
+    const chans=[]; for(let c=0;c<ch;c++) chans.push(audio.getChannelData(c));
+    let off=44;
+    for(let i=0;i<frames;i++) for(let c=0;c<ch;c++){ let s=Math.max(-1,Math.min(1,chans[c][i])); v.setInt16(off,s<0?s*0x8000:s*0x7FFF,true); off+=2; }
+    return new Blob([v],{type:"audio/wav"});
+  }
+
+  function download(rec){
+    const url = URL.createObjectURL(rec.blob);
+    const a = document.createElement("a");
+    a.href=url; a.download=rec.outName; document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); },1500);
+  }
+
+  // ---- render ----
+  function render(){
+    list.innerHTML="";
+    files.forEach(rec=>{
+      const li=document.createElement("li"); li.className="item";
+
+      const top=document.createElement("div"); top.className="row-top";
+      const nm=document.createElement("div"); nm.className="name"; nm.textContent=rec.name;
+      const x=document.createElement("button"); x.className="x"; x.textContent="×"; x.title="Remove";
+      x.onclick=()=>{ const i=files.indexOf(rec); if(i>-1)files.splice(i,1); bar.style.display=files.length?"flex":"none"; render(); };
+      top.appendChild(nm); top.appendChild(x); li.appendChild(top);
+
+      const cv=document.createElement("canvas"); cv.className="wave"; li.appendChild(cv);
+      if(rec.buffer) drawWave(cv, rec.buffer);
+
+      const meta=document.createElement("div"); meta.className="meta";
+      const parts=[];
+      if(rec.dur) parts.push(`<span class="mono">${fmtTime(rec.dur)}</span>`);
+      if(rec.sr) parts.push(`<span class="mono">${(rec.sr/1000).toFixed(1)} kHz · ${rec.ch===1?"mono":"stereo"}</span>`);
+      parts.push(`<span><b>${fmtSize(rec.origSize)}</b>${rec.outSize?` → <b>${fmtSize(rec.outSize)}</b> ${rec.outName.split(".").pop().toUpperCase()}`:""}</span>`);
+      meta.innerHTML=parts.join("");
+      li.appendChild(meta);
+
+      const bottom=document.createElement("div"); bottom.className="row-top";
+      const st=document.createElement("span");
+      const label={queued:"Queued",decoding:"Reading…",ready:"Ready to convert",encoding:"Converting…",done:"Converted",error:"Error"}[rec.state]||rec.state;
+      st.className="status st-"+rec.state; st.innerHTML=`<span class="s-dot"></span>${label}`;
+      bottom.appendChild(st);
+
+      if(rec.state==="done"){
+        const dl=document.createElement("button"); dl.className="dl"; dl.textContent="Download "+rec.outName.split(".").pop().toUpperCase();
+        dl.onclick=()=>download(rec); bottom.appendChild(dl);
+      }
+      li.appendChild(bottom);
+
+      if(rec.err){ const e=document.createElement("div"); e.className="meta"; e.style.color="var(--warn)"; e.textContent=rec.err; li.appendChild(e); }
+
+      list.appendChild(li);
+    });
+    const anyReady = files.some(f=>f.state==="ready");
+    $("#convert").disabled = !anyReady;
+  }
+
+  function drawWave(canvas, audio){
+    const dpr=window.devicePixelRatio||1;
+    const w=canvas.clientWidth||600, h=46;
+    canvas.width=w*dpr; canvas.height=h*dpr;
+    const c=canvas.getContext("2d"); c.scale(dpr,dpr);
+    const data=audio.getChannelData(0), buckets=Math.min(w, 480), step=Math.floor(data.length/buckets)||1;
+    c.clearRect(0,0,w,h);
+    c.fillStyle="#0F7A6B"; const mid=h/2;
+    for(let i=0;i<buckets;i++){
+      let max=0; const start=i*step;
+      for(let j=0;j<step;j++){ const val=Math.abs(data[start+j]||0); if(val>max)max=val; }
+      const bh=Math.max(1.2, max*(h*0.86)), xw=w/buckets;
+      c.fillRect(i*xw, mid-bh/2, Math.max(1,xw*0.62), bh);
+    }
+  }
+
+  window.addEventListener("resize", ()=>{ document.querySelectorAll(".item").forEach((li,i)=>{ const cv=li.querySelector("canvas"); if(cv&&files[i]&&files[i].buffer) drawWave(cv,files[i].buffer); }); });
+})();
+</script>
+</body>
+</html>
