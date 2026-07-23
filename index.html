@@ -139,9 +139,8 @@
 <header>
   <div class="eyebrow">On-device · no upload</div>
   <h1>Local audio <em>converter</em></h1>
-  <p class="lede">Turn iPad recordings (AAC / M4A) into MP3 or WAV your WebXR platform can load. Files are decoded and re-encoded right here in the browser.</p>
-  <div class="privacy"><span class="dot"></span> Nothing leaves this device — no file is ever sent to a server.</div>
-</header>
+  <p class="lede">Turn iPad recordings (AAC / M4A) into MP3 or WAV.</p>
+  </header>
 
 <div class="banner" id="banner"></div>
 
@@ -176,7 +175,7 @@
 
 <ul id="list"></ul>
 
-<p class="note" id="note">Tip: MP3 at 192 kbps is plenty for spoken narration and keeps files small — handy if a scene loads many clips at once. Use WAV if your loader is still fussy after MP3. Nothing here is uploaded, which keeps student voice recordings on the device.</p>
+<p class="note" id="note">Tip: MP3 at 192 kbps is plenty for spoken narration and keeps files small.</p>
 
 <script>
 (function(){
@@ -193,7 +192,7 @@
   if(!MP3_OK){
     fMp3.disabled = true; kbpsSel.disabled = true; kbpsWrap.style.opacity = ".4";
     setFormat("wav");
-    showBanner("MP3 encoder couldn't load (likely no network). WAV conversion still works fully offline.");
+    showBanner("MP3 encoder couldn't load. WAV conversion still works fully offline.");
   }
 
   function showBanner(msg){ banner.textContent = msg; banner.classList.add("show"); }
@@ -245,7 +244,7 @@
       rec.buffer = audio; rec.dur = audio.duration; rec.sr = audio.sampleRate; rec.ch = audio.numberOfChannels;
       rec.state = "ready";
     }catch(err){
-      rec.state = "error"; rec.err = "Couldn't read this file — it may be an unsupported or damaged recording.";
+      rec.state = "error"; rec.err = "Couldn't read this file.";
     }
     render();
   }
